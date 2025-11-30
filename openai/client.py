@@ -20,23 +20,50 @@ geminiClient = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
 )
 
-ZERO_SHOT = "Give only coding answers to question, if not possible , say sorry."
-FEW_SHOT_PROMPT = """Give only coding answers to question, if not possible , say sorry. 
-                Rule: follow JSON output format in answers
-                
-                Output Format:
-                {{
-                    "code": "string" or null
-                    "isCodingQuestion" : boolean
-                }}
-                    
-                Examples:
-                Q: tell joke
-                A: sorry no
-                
-                Q: give me recepy for meal XY
-                A: sorry no
-                """
+# Prompt templates
+
+# Zero-shot prompt: minimal instruction-only guardrails
+ZERO_SHOT_PROMPT = (
+    "Answer only coding questions with code. If the request is not about programming, reply: 'sorry, no'."
+)
+
+# Few-shot prompt: adds format rules and examples for stricter behavior
+FEW_SHOT_PROMPT = """
+You are a coding-only assistant.
+Rules:
+- If the request is not about programming, reply exactly: "sorry, no".
+- When it is a coding request, reply in JSON using the schema below.
+
+Output JSON schema:
+{
+  "code": string | null,
+  "isCodingQuestion": boolean
+}
+
+Examples:
+Q: tell a joke
+A: {"code": null, "isCodingQuestion": false}
+
+Q: give me recipe for meal XY
+A: {"code": null, "isCodingQuestion": false}
+
+Q: write a Python function that returns the square of a number
+A: {"code": "def square(x: int) -> int:\n    return x * x", "isCodingQuestion": true}
+"""
+
+from typing import Literal
+
+# Persona prompt: prepend to zero/few-shot to steer tone/role
+PERSONA_PROMPT = """
+Persona: {role}
+Tone: {tone}
+Audience: {audience}
+
+Guidance:
+- Keep responses concise and professional.
+- Prefer deterministic, safe solutions.
+- If constraints conflict, prioritize correctness over style.
+"""
 
 CHAIN_OF_THOUGHT_PROMPT = """
 System prompt (Chain-of-Thought safe template):
@@ -70,10 +97,30 @@ def is_palindrome(s: str) -> bool:
     cleaned = re.sub(r"[^A-Za-z0-9]", "", s).lower()
     return cleaned == cleaned[::-1]
 """
+PromptMode = Literal["zero", "few", "cot"]
+
+def build_system_prompt(mode: PromptMode, role: str, tone: str, audience: str) -> str:
+    persona = PERSONA_PROMPT.format(role=role, tone=tone, audience=audience).strip()
+    if mode == "zero":
+        return f"{persona}\n\n{ZERO_SHOT_PROMPT}"
+    if mode == "few":
+        return f"{persona}\n\n{FEW_SHOT_PROMPT}"
+    # default to CoT safe policy
+    return f"{persona}\n\n{CHAIN_OF_THOUGHT_PROMPT}"
+
+
+# Config via environment variables with sensible defaults
+PROMPT_MODE: PromptMode = os.getenv("PROMPT_MODE", "zero").lower()  # zero|few|cot
+PERSONA_ROLE = os.getenv("PERSONA_ROLE", "Senior Python library maintainer")
+PERSONA_TONE = os.getenv("PERSONA_TONE", "concise, professional")
+PERSONA_AUDIENCE = os.getenv("PERSONA_AUDIENCE", "intermediate developers")
+
+system_prompt = build_system_prompt(PROMPT_MODE, PERSONA_ROLE, PERSONA_TONE, PERSONA_AUDIENCE)
+
 message_history = [
-    {"role": "system",
-     "content": CHAIN_OF_THOUGHT_PROMPT}
+    {"role": "system", "content": system_prompt}
 ]
+
 # add history
 user_query = input("Enter: ")
 message_history.append({"role": "user", "content": user_query})
