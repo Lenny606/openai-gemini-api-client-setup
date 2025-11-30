@@ -179,3 +179,118 @@ Assistant:
 ## Using ChatML with this project
 - The included clients (`openai/client.py`, `gemini/client.py`) already send structured `messages=[{role, content}]`. Prefer that over packing ChatML into a single string.
 - If you must send a single prompt (e.g., a different endpoint), compose the ChatML string using the templates above, optionally combining with the Persona guidance used elsewhere in this repo.
+
+# INST Prompt style
+The INST style uses bracketed instruction markers popularized by LLaMA/Mistral instruct models. It wraps the user instruction (optionally preceded by a system section) between opening and closing tags. This is useful when a single prompt string must encode roles and guardrails without a structured messages array.
+
+Notes:
+- Common tokens: `[INST] ... [/INST]` and optional system section `<<SYS>> ... <</SYS>>` inside the first instruction.
+- Some model families expect BOS/EOS tokens like `<s>` and may emit `</s>`; your client/SDK usually handles them.
+- Prefer your SDK’s structured messages when available; use INST only when a model is fine‑tuned on it or a single text field is required.
+
+## Minimal template (single turn)
+
+```
+[INST]
+{user_instruction}
+[/INST]
+```
+
+Where `{user_instruction}` is the user’s request.
+
+## With System section (LLaMA‑style)
+
+Use a system block to encode persona/guardrails inside the first instruction:
+
+```
+[INST] <<SYS>>
+{system_content}
+<</SYS>>
+
+{user_instruction}
+[/INST]
+```
+
+Example `system_content` (aligns with this repo’s Persona + Zero‑shot guardrail):
+
+```
+Persona: Senior Python library maintainer
+Tone: concise, professional
+Audience: intermediate developers
+
+Guidance:
+- Keep responses concise and professional.
+- Prefer deterministic, safe solutions.
+- If constraints conflict, prioritize correctness over style.
+
+Answer only coding questions with code. If the request is not about programming, reply: 'sorry, no'.
+```
+
+## Example: Persona + INST
+
+```
+[INST] <<SYS>>
+Persona: Senior Python library maintainer
+Tone: concise, professional
+Audience: intermediate developers
+
+Answer only coding questions with code. If the request is not about programming, reply: 'sorry, no'.
+<</SYS>>
+
+Write a Python function that returns the square of a number.
+[/INST]
+```
+
+Possible model output:
+
+```
+def square(x: int) -> int:
+    return x * x
+```
+
+## Few‑shot with INST (multi‑turn examples)
+Demonstrate desired behavior by including several instruction/response pairs. The assistant’s response follows the closing `[/INST]` of each example.
+
+```
+[INST] <<SYS>>
+You are a coding‑only assistant.
+Rules:
+- If the request is not about programming, reply exactly: "sorry, no".
+- When it is a coding request, reply in JSON using the schema below.
+
+Output JSON schema:
+{
+  "code": string | null,
+  "isCodingQuestion": boolean
+}
+<</SYS>>
+
+tell a joke
+[/INST]
+{"code": null, "isCodingQuestion": false}
+
+[INST]
+give me recipe for meal XY
+[/INST]
+{"code": null, "isCodingQuestion": false}
+
+[INST]
+write a Python function that returns the square of a number
+[/INST]
+{"code": "def square(x: int) -> int:\n    return x * x", "isCodingQuestion": true}
+```
+
+## When INST tokens aren’t recognized
+If a model or endpoint doesn’t support `[INST]`/`[/INST]`/`<<SYS>>`, mimic the structure with plain headers:
+
+```
+System:
+{system_content}
+
+Instruction:
+{user_instruction}
+```
+
+## Using INST with this project
+- The included clients (`openai/client.py`, `gemini/client.py`) already support structured `messages=[{role, content}]`; prefer that when possible.
+- If you must send a single prompt string (e.g., different endpoint or a finetuned INST model), compose the string using the templates above. You can reuse the Persona content from this repo in the `<<SYS>>` block.
