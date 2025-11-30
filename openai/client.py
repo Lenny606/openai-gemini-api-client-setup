@@ -1,3 +1,5 @@
+import json
+
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
@@ -5,11 +7,12 @@ import os
 load_dotenv()
 gemini_key = os.getenv("GEMINI_API_KEY")
 
-client = OpenAI()
-response = client.responses.create(
-    model="gpt-4o-mini",
-    input="What day is today?"
-)
+# client = OpenAI()
+# response = client.responses.create(
+#     model="gpt-4o-mini",
+#     input="What day is today?"
+# )
+# print(response.output_text)
 
 # gemini compatible
 geminiClient = OpenAI(
@@ -35,8 +38,7 @@ FEW_SHOT_PROMPT = """Give only coding answers to question, if not possible , say
                 A: sorry no
                 """
 
-
-CHOT_PROMPT = """
+CHAIN_OF_THOUGHT_PROMPT = """
 System prompt (Chain-of-Thought safe template):
 You are an expert AI coding assistant. Solve tasks with deep internal reasoning, but do not reveal your chain-of-thought.
 
@@ -68,16 +70,21 @@ def is_palindrome(s: str) -> bool:
     cleaned = re.sub(r"[^A-Za-z0-9]", "", s).lower()
     return cleaned == cleaned[::-1]
 """
-responseGemini = geminiClient.chat.completions.create(
-    model="gemini-2.5-flash",
-    messages=[
-        {"role": "system", "content": FEW_SHOT_PROMPT},
-        {
-            "role": "user",
-            "content": "tell me about weather today"
-        }
-    ]
-)
+message_history = [
+    {"role": "system",
+     "content": CHAIN_OF_THOUGHT_PROMPT}
+]
+# add history
+user_query = input("Enter: ")
+message_history.append({"role": "user", "content": user_query})
 
-print(response.output_text)
-print(responseGemini.choices[0].message.content)
+while True:
+    responseGemini = geminiClient.chat.completions.create(
+        model="gemini-2.5-flash",
+        messages=message_history
+    )
+
+    raw_output = responseGemini.choices[0].message.content
+    message_history.append({"role": "assistant", "content": raw_output})
+
+    print(raw_output)
