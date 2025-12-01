@@ -15,6 +15,8 @@ geminiClient = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
 )
 
+def run_command(command: str) -> int:
+    return os.system(command)
 
 def get_weather(city: str) -> str:
     """
@@ -47,6 +49,7 @@ Policy:
   
 Available tools:
 - get_weather(city: str) -> str: Get current weather conditions for a city
+- run_command(command: str) -> int: Run a shell command and return its exit code
 
 Output format for different tasks:
 
