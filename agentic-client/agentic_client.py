@@ -1,9 +1,10 @@
 import json
 import requests
-from typing import Literal
+from typing import Literal, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+from pydantic import BaseModel, Field
 
 load_dotenv()
 gemini_key = os.getenv("GEMINI_API_KEY")
@@ -78,10 +79,20 @@ message_history = [
 user_query = input("Enter: ")
 message_history.append({"role": "user", "content": user_query})
 
+
+# Schema
+class OutputFormat(BaseModel):
+    step: str = Field(..., description="ID of step in chain of though")
+    content: Optional[str] = Field(None, description="Optional content of step")
+    tool: Optional[str] = Field(None, description="Optional tool used in step")
+    input: Optional[str] = Field(None, description="Optional input to tool")
+
+
 while True:
-    responseGemini = geminiClient.chat.completions.create(
+    responseGemini = geminiClient.chat.completions.parse(
         model="gemini-2.5-flash",
         messages=message_history,
+        response_format=OutputFormat
     )
 
     raw_output = responseGemini.choices[0].message.content
