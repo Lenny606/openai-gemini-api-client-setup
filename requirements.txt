@@ -1,3 +1,7 @@
+booktype
+rq
+uvicorn
+fastapi
 openai
 langchain-qdrant
 langchain-openai
