@@ -2,7 +2,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
-
+# rq worker command
 load_dotenv()
 
 client = OpenAI()
