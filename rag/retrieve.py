@@ -2,7 +2,6 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from dotenv import load_dotenv
 from openai import OpenAI
-
 load_dotenv()
 
 # vector embedding for query
