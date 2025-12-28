@@ -61,6 +61,7 @@ def chat(message, history):
         message = res.choices[0].message
         res = handle_tool_call(message)
         print(res)
+        messages.append(message)
         messages.append(res)  # reply from tool added to 2nd llm call
         res = ollama.chat.completions.create(model=model, messages=messages, tools=tools)
 
