@@ -22,6 +22,7 @@ ollama = OpenAI(
 
 chat = OpenAI()
 
+
 def get_ticket_prices(city):
     prices = {
         "prague": "52",
@@ -56,39 +57,55 @@ def chat(message, history):
     messages = messages + history + [{"role": "user", "content": message}]
     res = ollama.chat.completions.create(model=model, messages=messages, tools=tools)
     print(res)
-    if res.choices[0].finish_reason == "tool_calls":
 
+    while res.choices[0].finish_reason == "tool_calls":
         message = res.choices[0].message
-        res = handle_tool_call(message)
-        print(res)
+        r = handle_tool_call(message)
         messages.append(message)
-        messages.append(res)  # reply from tool added to 2nd llm call
-        res = ollama.chat.completions.create(model=model, messages=messages, tools=tools)
+        messages.extend(r)  # reply from tool added to 2nd llm call
 
+        res = ollama.chat.completions.create(model=model, messages=messages)
+
+    print(res)
     return res.choices[0].message.content
 
 
 def handle_tool_call(message):
-    tool_call = message.tool_calls[0]
-    if tool_call.function.name == "get_ticket_prices":
-        args = json.loads(tool_call.function.arguments)
-        city = args.get("city", None)
-        print("Tool called: " + city or "Unknown")
-        if city is not None:
+    responses = []
+    for tool_call in message.tool_calls:
+        if tool_call.function.name == "get_ticket_prices":
+            args = json.loads(tool_call.function.arguments)
+            city = args.get("city", None)
+            print(f"Tool called: {city}")
             price = get_ticket_prices(city)
-            response = {
-                "role" : "tool",
+            r = {
+                "role": "tool",
                 "content": price,
                 "tool_call_id": tool_call.id,
             }
-            return response
+            responses.append(r)
 
-        return {
-                "role" : "tool",
-                "content": "No price found",
-                "tool_call_id": tool_call.id,
-            }
+    return responses
 
+    # tool_call = message.tool_calls[0]
+    # if tool_call.function.name == "get_ticket_prices":
+    #     args = json.loads(tool_call.function.arguments)
+    #     city = args.get("city", None)
+    #     print("Tool called: " + city or "Unknown")
+    #     if city is not None:
+    #         price = get_ticket_prices(city)
+    #         response = {
+    #             "role" : "tool",
+    #             "content": price,
+    #             "tool_call_id": tool_call.id,
+    #         }
+    #         return response
+    #
+    #     return {
+    #             "role" : "tool",
+    #             "content": "No price found",
+    #             "tool_call_id": tool_call.id,
+    #         }
 
 
 chat_ui = gr.ChatInterface(
